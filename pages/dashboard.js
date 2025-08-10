@@ -1,70 +1,72 @@
-import Navbar from "../components/Navbar";
-import ChatBox from "../components/ChatBox";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
-export default function Dashboard({ supabase: sb, session }) {
+export default function Dashboard() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [tokens, setTokens] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const { data } = await sb.auth.getSession();
-      const usr = data?.session?.user ?? null;
-      if (!usr) {
-        setLoading(false);
-        setUser(null);
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
         return;
       }
-      setUser({ id: usr.id, email: usr.email });
-      // try to fetch profile
-      const { data: p, error } = await sb.from("profiles").select("*").eq("id", usr.id).single();
-      if (error) {
-        // create profile with initial tokens
-        const init = 5;
-        await sb.from("profiles").insert({ id: usr.id, username: usr.email, token_balance: init });
-        const { data: p2 } = await sb.from("profiles").select("*").eq("id", usr.id).single();
-        setProfile(p2);
-      } else {
-        setProfile(p);
-      }
+
+      setUser(user);
+      // Здесь будет запрос к базе для получения токенов
+      // Пока ставим тестовое значение
+      setTokens(0);
       setLoading(false);
-    }
-    load();
-  }, [sb]);
+    };
 
-  if (loading) return <div className="min-h-screen p-8"><Navbar /><div className="mt-8">Loading...</div></div>;
+    getUser();
+  }, [router]);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen p-8">
-        <Navbar />
-        <div className="mt-8 max-w-4xl mx-auto">
-          <div className="glass p-8 rounded-xl">
-            <h2 className="text-2xl">Вы не вошли</h2>
-            <p className="mt-4">Войдите через Supabase Auth (magic link).</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  const handleAddTokens = () => {
+    // Тут позже будет логика пополнения через оплату
+    setTokens(tokens + 100);
+  };
+
+  if (loading) return <p>Загрузка...</p>;
 
   return (
-    <div className="min-h-screen p-8">
-      <Navbar />
-      <div className="mt-8 max-w-6xl mx-auto grid grid-cols-3 gap-6">
-        <div className="col-span-2">
-          <ChatBox user={user} />
-        </div>
-        <aside className="glass p-4 rounded-lg">
-          <h3 className="text-lg">Аккаунт</h3>
-          <p className="mt-2 text-sm">Email: {user.email}</p>
-          <p className="mt-4">Tokens: <span className="text-2xl text-neon">{profile?.token_balance ?? "—"}</span></p>
-          <div className="mt-4">
-            <button className="neon-btn" onClick={() => alert("Buy tokens: use admin endpoint or integrate Stripe later.")}>Buy tokens</button>
-          </div>
-        </aside>
+    <div style={{ maxWidth: "800px", margin: "50px auto", textAlign: "center" }}>
+      <h1>Личный кабинет</h1>
+      <p><strong>Email:</strong> {user.email}</p>
+      <p><strong>Баланс токенов:</strong> {tokens}</p>
+
+      <button onClick={handleAddTokens} style={{ margin: "10px", padding: "8px 16px" }}>
+        Пополнить токены (тест)
+      </button>
+      <button onClick={handleLogout} style={{ margin: "10px", padding: "8px 16px" }}>
+        Выйти
+      </button>
+
+      <div style={{ marginTop: "30px" }}>
+        <h2>Доступные модули:</h2>
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          <li><a href="/chat">💬 Чат-бот</a></li>
+          <li style={{ opacity: 0.5 }}>🖼 Генератор изображений (скоро)</li>
+          <li style={{ opacity: 0.5 }}>🎥 Генератор видео (скоро)</li>
+          <li style={{ opacity: 0.5 }}>📄 Анализ документов (скоро)</li>
+          <li style={{ opacity: 0.5 }}>🎙 Аудио/видео конвертер (скоро)</li>
+          <li style={{ opacity: 0.5 }}>🌐 AI-переводчик (скоро)</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
       </div>
     </div>
   );
