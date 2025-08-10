@@ -1,175 +1,472 @@
+// pages/dashboard.js
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/router";
+import { supabase } from "../lib/supabaseClient";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+/**
+ * Cataleya Dashboard
+ * - Left sidebar (profile menu)
+ * - Top model selector (Chat / Image / Video / Docs / Audio)
+ * - Provider selection inside tab + settings
+ * - Token/Tariff cards
+ * - Chat area below (works with /api/chat)
+ */
 
-export default function Dashboard() {
+const TABS = [
+  { id: "chat", label: "Chat" },
+  { id: "image", label: "Image" },
+  { id: "video", label: "Video" },
+  { id: "docs", label: "Docs" },
+  { id: "audio", label: "Audio" }
+];
+
+const PROVIDERS = {
+  chat: {
+    title: "Chat providers",
+    items: [
+      { id: "chat:gpt-4o-mini", name: "GPT-4o-mini", desc: "fast, cheap, general" },
+      { id: "chat:gpt-4o", name: "GPT-4o", desc: "high-quality responses" }
+    ],
+    defaults: { temperature: 0.7, max_tokens: 800 }
+  },
+  image: {
+    title: "Image providers",
+    items: [
+      { id: "image:sdxl", name: "Stable Diffusion XL", desc: "photoreal & stylized" },
+      { id: "image:midjourney", name: "MidJourney", desc: "artistic illustrations" },
+      { id: "image:replicate", name: "Replicate", desc: "many community models" }
+    ],
+    defaults: { width: 1024, height: 1024, quality: "high" }
+  },
+  video: {
+    title: "Video providers",
+    items: [
+      { id: "video:runway", name: "Runway", desc: "video generation & editing" },
+      { id: "video:pika", name: "Pika Labs", desc: "fast video drafts" }
+    ],
+    defaults: { resolution: "720p", duration_sec: 6 }
+  },
+  docs: {
+    title: "Docs/Analyzer",
+    items: [{ id: "docs:openai", name: "OpenAI", desc: "text understanding & summarization" }],
+    defaults: { max_summary_len: 300 }
+  },
+  audio: {
+    title: "Audio",
+    items: [{ id: "audio:whisper", name: "Whisper", desc: "speech-to-text" }],
+    defaults: { language: "auto" }
+  }
+};
+
+export default function DashboardPage() {
   const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [tokens, setTokens] = useState(0);
+  const [profile, setProfile] = useState(null);
+
   const [activeTab, setActiveTab] = useState("chat");
-  const [model, setModel] = useState("gpt-4o-mini");
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [settings, setSettings] = useState({});
+  const [savingSettings, setSavingSettings] = useState(false);
 
-  // Загружаем пользователя и токены
+  const [chatMessages, setChatMessages] = useState([]); // chat area
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.push("/");
-      } else {
-        setUser(data.user);
-        fetchTokens(data.user.id);
+    async function init() {
+      setLoading(true);
+      const { data } = await supabase.auth.getUser();
+      const usr = data?.user ?? null;
+      if (!usr) {
+        router.push("/login");
+        return;
       }
-    });
-  }, []);
+      setUser(usr);
 
-  const fetchTokens = async (userId) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("tokens")
-      .eq("id", userId)
-      .single();
-    if (!error && data) {
-      setTokens(data.tokens);
+      const { data: p, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", usr.id)
+        .single();
+
+      if (error || !p) {
+        const initProfile = {
+          id: usr.id,
+          username: usr.email,
+          token_balance: 0,
+          selected_model: null,
+          settings: {}
+        };
+        await supabase.from("profiles").insert(initProfile);
+        setProfile(initProfile);
+        setSelectedProvider(null);
+        setSettings({});
+      } else {
+        setProfile(p);
+        setSelectedProvider(p.selected_model ?? null);
+        setSettings(p.settings ?? {});
+      }
+      setLoading(false);
     }
-  };
+    init();
+  }, [router]);
 
-  // Отправка сообщения в чат
-  const sendMessage = async () => {
-    if (!input.trim() || loading || tokens <= 0) return;
+  async function saveSettingsToProfile(providerId, newSettings) {
+    if (!user) return;
+    setSavingSettings(true);
+    try {
+      const payload = {
+        selected_model: providerId,
+        settings: newSettings
+      };
+      const { error } = await supabase
+        .from("profiles")
+        .update(payload)
+        .eq("id", user.id);
 
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setLoading(true);
+      if (error) {
+        console.error("Failed to save profile settings:", error);
+        alert("Ошибка при сохранении настроек: " + error.message);
+      } else {
+        const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        setProfile(p);
+        setSelectedProvider(providerId);
+        setSettings(newSettings);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Ошибка сети при сохранении.");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleBuyTokensPrompt() {
+    if (!user) return alert("User not found");
+    const amountStr = prompt("Сколько токенов добавить? (например 100)");
+    const amount = parseInt(amountStr || "0", 10);
+    if (!amount || amount <= 0) return;
+    try {
+      const res = await fetch("/api/tokens/credit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id, amount, description: "Manual buy (test)" })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert("Ошибка пополнения: " + (data.error || JSON.stringify(data)));
+      } else {
+        const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        setProfile(p);
+        alert("Баланс обновлён: +" + amount + " токенов");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Ошибка сети при пополнении");
+    }
+  }
+
+  function onSelectProvider(providerId) {
+    const [tabKey] = providerId.split(":");
+    const providerDefaults = PROVIDERS[tabKey]?.defaults ?? {};
+    const curSettings = (profile && profile.selected_model === providerId && profile.settings) ? profile.settings : providerDefaults;
+    saveSettingsToProfile(providerId, curSettings);
+  }
+
+  function updateSettingField(key, value, autosave = false) {
+    const newSettings = { ...(settings || {}), [key]: value };
+    setSettings(newSettings);
+    if (autosave) {
+      saveSettingsToProfile(selectedProvider, newSettings);
+    }
+  }
+
+  async function sendChat() {
+    if (!chatInput.trim()) return;
+    const messageText = chatInput;
+    setChatMessages(prev => [...prev, { role: "user", text: messageText }]);
+    setChatInput("");
+    setChatLoading(true);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, message: userMessage.content }),
+        body: JSON.stringify({ message: messageText, user_id: user?.id })
       });
-
       const data = await res.json();
-      if (data.reply) {
-        setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
-        fetchTokens(user.id);
+      if (!res.ok) {
+        setChatMessages(prev => [...prev, { role: "assistant", text: `⚠️ Ошибка: ${data.error || JSON.stringify(data)}` }]);
       } else {
-        setMessages((prev) => [...prev, { role: "assistant", content: "Ошибка ответа от ИИ" }]);
+        setChatMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
       }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: "assistant", content: "Ошибка запроса" }]);
+      setChatMessages(prev => [...prev, { role: "assistant", text: `⚠️ Сетевая ошибка: ${err.message}` }]);
+    } finally {
+      setChatLoading(false);
     }
-    setLoading(false);
-  };
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white bg-black">
+        <div className="text-center">
+          <div className="animate-pulse text-neon text-2xl">Загрузка Dashboard...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
-      <div className="max-w-6xl mx-auto p-6">
-        
-        {/* Хедер */}
-        <header className="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-          <h1 className="text-3xl font-bold text-green-400 drop-shadow-lg">Cataleya</h1>
-          <div className="bg-gray-800/70 px-4 py-2 rounded-lg text-sm backdrop-blur-lg border border-gray-700">
-            💎 Токены: <span className="text-green-400 font-semibold">{tokens}</span>
-          </div>
-        </header>
+    <div className="min-h-screen bg-gradient-to-b from-[#040404] to-[#080808] text-white">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-emerald-500/6">
+        <div className="flex items-center gap-4">
+          <div className="text-2xl font-extrabold text-neon">CATALeya</div>
+          <div className="text-sm text-muted hidden md:block">AI hub — Dashboard</div>
+        </div>
 
-        {/* Навигация */}
-        <nav className="flex gap-4 mb-6">
-          {[
-            { key: "chat", label: "💬 Чат" },
-            { key: "images", label: "🖼 Генерация изображений" },
-            { key: "profile", label: "👤 Профиль" },
-          ].map((tab) => (
+        <nav className="flex items-center gap-2">
+          {TABS.map(t => (
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                activeTab === tab.key
-                  ? "bg-green-500 text-black"
-                  : "bg-gray-800/80 text-white hover:bg-gray-700"
-              }`}
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === t.id ? 'bg-emerald-700/40 border border-emerald-500' : 'text-[var(--muted)] hover:text-white'}`}
             >
-              {tab.label}
+              {t.label}
             </button>
           ))}
         </nav>
 
-        {/* Контент */}
-        {activeTab === "chat" && (
-          <div>
-            {/* Выбор модели */}
-            <div className="mb-4 flex items-center gap-4">
-              <label className="text-gray-300">Модель:</label>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white"
-              >
-                <option value="gpt-4o-mini">GPT-4o-mini</option>
-                <option value="gpt-4.1">GPT-4.1</option>
-              </select>
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted hidden sm:block">Tokens: <span className="text-neon font-bold ml-2">{profile?.token_balance ?? 0}</span></div>
+          <button onClick={handleBuyTokensPrompt} className="bg-emerald-500 hover:bg-emerald-600 text-black px-3 py-2 rounded-md font-semibold">Buy</button>
+          <button onClick={handleLogout} className="px-3 py-2 rounded-md border border-white/10">Logout</button>
+        </div>
+      </header>
+
+      <main className="p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <aside className="lg:col-span-3 bg-gray-900/60 glass p-5 rounded-xl border border-emerald-500/6">
+          <div className="mb-6">
+            <div className="text-sm text-muted">Профиль</div>
+            <div className="mt-2 font-semibold text-[var(--text)] break-words">{user?.email}</div>
+          </div>
+
+          <ul className="space-y-3 text-sm">
+            <li className="flex items-center justify-between">
+              <div>
+                <div className="text-muted">Тариф</div>
+                <div className="font-semibold">FREE</div>
+              </div>
+              <div className="text-sm text-neon font-bold">Free</div>
+            </li>
+
+            <li>
+              <div className="text-muted">Баланс токенов</div>
+              <div className="text-neon font-bold text-xl">{profile?.token_balance ?? 0}</div>
+            </li>
+
+            <li>
+              <button onClick={handleBuyTokensPrompt} className="w-full mt-2 btn-neon">Пополнить</button>
+            </li>
+
+            <li className="pt-4 border-t border-white/5">
+              <nav className="flex flex-col gap-2 text-sm">
+                <a className="text-[var(--text)]">📌 Профиль</a>
+                <a className="text-[var(--text)]">⭐ Подписка</a>
+                <a className="text-[var(--text)]">⚡ Токены</a>
+                <a className="text-[var(--text)]">📝 Лента запросов</a>
+                <a className="text-[var(--text)]">🤝 Партнёрская программа</a>
+                <button onClick={handleLogout} className="mt-2 px-3 py-2 rounded-md border border-white/6 text-sm">Выход</button>
+              </nav>
+            </li>
+          </ul>
+        </aside>
+
+        <section className="lg:col-span-6 space-y-6">
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-sm text-muted">Выбранная вкладка</div>
+                <div className="font-semibold">{TABS.find(t => t.id === activeTab)?.label}</div>
+              </div>
+              <div className="text-sm text-muted">Selected: <span className="ml-2 text-neon">{profile?.selected_model ?? "—"}</span></div>
             </div>
 
-            {/* Чат */}
-            <div className="bg-gray-800/70 backdrop-blur-lg rounded-xl shadow-lg p-6 h-[500px] overflow-y-auto space-y-4 border border-gray-700">
-              {messages.length === 0 ? (
-                <p className="text-gray-400 text-center">Начните общение с ИИ</p>
-              ) : (
-                messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3 rounded-lg max-w-[80%] whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "bg-green-500 text-black ml-auto"
-                        : "bg-gray-700 text-white"
-                    }`}
-                  >
-                    {msg.content}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(PROVIDERS[activeTab]?.items || []).map(p => (
+                <div key={p.id} className={`p-3 rounded-lg border ${profile?.selected_model === p.id ? 'border-emerald-400 bg-emerald-900/10' : 'border-white/5'} flex flex-col justify-between`}>
+                  <div>
+                    <div className="font-semibold">{p.name}</div>
+                    <div className="text-sm text-muted mt-1">{p.desc}</div>
                   </div>
-                ))
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => onSelectProvider(p.id)}
+                      className="px-3 py-1 rounded-md bg-emerald-500 text-black font-semibold"
+                    >
+                      Select
+                    </button>
+                    {profile?.selected_model === p.id && <span className="text-sm text-neon font-medium">Selected</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold">Настройки — {activeTab}</div>
+              <div className="text-sm text-muted">Provider: <span className="text-neon ml-2">{profile?.selected_model ?? "—"}</span></div>
+            </div>
+
+            <div className="space-y-3">
+              {activeTab === "chat" && (
+                <>
+                  <label className="text-sm text-muted">Temperature: <span className="text-neon font-semibold">{settings?.temperature ?? PROVIDERS.chat.defaults.temperature}</span></label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={settings?.temperature ?? PROVIDERS.chat.defaults.temperature}
+                    onChange={(e) => updateSettingField("temperature", parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <label className="text-sm text-muted">Max tokens</label>
+                  <input
+                    type="number"
+                    value={settings?.max_tokens ?? PROVIDERS.chat.defaults.max_tokens}
+                    onChange={(e) => updateSettingField("max_tokens", parseInt(e.target.value || "0", 10))}
+                    className="input w-36"
+                  />
+                </>
+              )}
+
+              {activeTab === "image" && (
+                <>
+                  <label className="text-sm text-muted">Размер</label>
+                  <div className="flex gap-2">
+                    <select value={settings?.size ?? `${PROVIDERS.image.defaults.width}x${PROVIDERS.image.defaults.height}`} onChange={(e) => {
+                      const [w,h] = e.target.value.split("x").map(Number);
+                      updateSettingField("width", w);
+                      updateSettingField("height", h);
+                    }} className="input">
+                      <option value="512x512">512 × 512</option>
+                      <option value="768x768">768 × 768</option>
+                      <option value="1024x1024">1024 × 1024</option>
+                    </select>
+                    <select value={settings?.quality ?? PROVIDERS.image.defaults.quality} onChange={(e) => updateSettingField("quality", e.target.value)} className="input w-36">
+                      <option value="draft">Draft (fast)</option>
+                      <option value="standard">Standard</option>
+                      <option value="high">High quality</option>
+                    </select>
+                  </div>
+                  <label className="text-sm text-muted mt-2">Prompt для превью</label>
+                  <input className="input w-full" value={settings?.prompt ?? ""} placeholder="Describe image..." onChange={(e) => updateSettingField("prompt", e.target.value)} />
+                </>
+              )}
+
+              {activeTab === "video" && (
+                <>
+                  <label className="text-sm text-muted">Продолжительность (сек)</label>
+                  <input type="number" className="input w-36" value={settings?.duration_sec ?? PROVIDERS.video.defaults.duration_sec} onChange={(e) => updateSettingField("duration_sec", parseInt(e.target.value||"0",10))} />
+                  <label className="text-sm text-muted mt-2">Resolution</label>
+                  <select className="input w-44" value={settings?.resolution ?? PROVIDERS.video.defaults.resolution} onChange={(e)=>updateSettingField("resolution", e.target.value)}>
+                    <option>480p</option>
+                    <option>720p</option>
+                    <option>1080p</option>
+                  </select>
+                </>
+              )}
+
+              {activeTab === "docs" && (
+                <>
+                  <label className="text-sm text-muted">Max summary length</label>
+                  <input type="number" className="input w-36" value={settings?.max_summary_len ?? PROVIDERS.docs.defaults.max_summary_len} onChange={(e)=>updateSettingField("max_summary_len", parseInt(e.target.value||"0",10))} />
+                </>
+              )}
+
+              {activeTab === "audio" && (
+                <>
+                  <label className="text-sm text-muted">Language</label>
+                  <input className="input w-44" value={settings?.language ?? PROVIDERS.audio.defaults.language} onChange={(e)=>updateSettingField("language", e.target.value)} />
+                </>
               )}
             </div>
 
-            {/* Ввод */}
-            <div className="mt-4 flex gap-2">
-              <input
-                type="text"
-                placeholder="Введите сообщение..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-400 text-white"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={loading || tokens <= 0}
-                className="px-6 py-3 bg-green-500 hover:bg-green-400 text-black font-semibold rounded-lg transition disabled:bg-gray-500"
-              >
-                {loading ? "..." : "Отправить"}
-              </button>
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => saveSettingsToProfile(profile?.selected_model ?? null, settings)} className="btn-neon" disabled={savingSettings}>Save settings</button>
+              <button onClick={() => { setSettings(profile?.settings ?? {}); }} className="px-3 py-2 rounded-md border border-white/6">Reset</button>
             </div>
           </div>
-        )}
 
-        {activeTab === "images" && (
-          <div className="bg-gray-800/70 p-6 rounded-xl border border-gray-700 text-gray-400">
-            Здесь будет генерация изображений
-          </div>
-        )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+              <div className="text-sm text-muted">Тариф</div>
+              <div className="text-2xl font-bold">FREE</div>
+              <div className="text-sm text-muted mt-2">Пробные запросы почти во всех инструментах. Доп. лимиты можно купить.</div>
+              <div className="mt-4">
+                <button onClick={() => alert("Upgrade flow (Stripe) — в планах")} className="btn-neon">Обновить</button>
+              </div>
+            </div>
 
-        {activeTab === "profile" && (
-          <div className="bg-gray-800/70 p-6 rounded-xl border border-gray-700 text-gray-400">
-            Здесь будет профиль пользователя
+            <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted">Ваши токены</div>
+                  <div className="text-3xl font-bold text-neon">{profile?.token_balance ?? 0}</div>
+                </div>
+                <div className="text-sm text-muted">₽ / $</div>
+              </div>
+              <div className="mt-4">
+                <button onClick={handleBuyTokensPrompt} className="btn-neon">Buy tokens</button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+            <div className="text-sm text-muted mb-2">Chat (powered by OpenAI)</div>
+            <div className="h-56 overflow-y-auto space-y-3 p-2 bg-neutral-950 rounded-md">
+              {chatMessages.length === 0 && <div className="text-sm text-muted">Нет сообщений — начните диалог</div>}
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`max-w-[85%] p-2 rounded-md ${m.role === "user" ? "ml-auto bg-emerald-500 text-black" : "bg-neutral-800 text-emerald-200"}`}>
+                  {m.text}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <input value={chatInput} onChange={(e)=>setChatInput(e.target.value)} placeholder="Напишите сообщение..." className="flex-1 input" onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendChat(); }}} />
+              <button onClick={sendChat} className="bg-emerald-500 hover:bg-emerald-600 text-black px-4 rounded-md" disabled={chatLoading}>{chatLoading ? "..." : "Send"}</button>
+            </div>
+          </div>
+        </section>
+
+        <aside className="lg:col-span-3 space-y-6">
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+            <div className="text-sm text-muted">Quick actions</div>
+            <div className="mt-3 flex flex-col gap-2">
+              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left">История запросов</button>
+              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left">Экспорт</button>
+              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left">Безопасность</button>
+            </div>
+          </div>
+
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+            <div className="text-sm text-muted">Поддержка</div>
+            <div className="mt-3 text-sm">
+              Вопросы по интеграции — <a href="mailto:you@cataleya.app" className="text-neon">you@cataleya.app</a>
+            </div>
+          </div>
+        </aside>
+      </main>
     </div>
   );
 }
