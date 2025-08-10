@@ -4,92 +4,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Переменные */
-:root{
-  --bg: #050505;
-  --panel: rgba(10,10,10,0.6);
+/* CSS variables (можно менять в одном месте) */
+:root {
   --neon: #00f7c2;
   --petronas: #00b398;
+  --accent: #00F5FF;
+  --bg-1: #030303;
+  --bg-2: #0b0b0b;
+  --panel: rgba(12,12,12,0.56);
   --text: #E6FFF9;
   --muted: #A9EDE0;
 }
 
-/* Базовые */
-html,body,#__next{
-  height:100%;
-  background: linear-gradient(180deg,#030303 0%,#060606 100%);
+/* Page background & global text */
+html, body, #__next {
+  height: 100%;
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
   color: var(--text);
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism card */
+/* Glass card helper */
 .glass {
-  background: rgba(12,12,12,0.54);
+  background: var(--panel);
   backdrop-filter: blur(10px) saturate(140%);
   border: 1px solid rgba(0,247,194,0.08);
   border-radius: 14px;
   box-shadow: 0 6px 30px rgba(0,0,0,0.6), 0 2px 8px rgba(0,247,194,0.02);
 }
 
-/* Акцентная кнопка-неон */
-.neon-btn {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  background: linear-gradient(90deg, rgba(0,247,194,0.06), rgba(0,179,152,0.04));
-  border: 1px solid var(--neon);
-  color: #001518;
-  padding: 0.55rem 0.95rem;
-  border-radius: 10px;
-  font-weight:600;
-  transition: transform .12s ease, box-shadow .12s ease;
-}
-.neon-btn:hover{
-  transform: translateY(-3px);
-  box-shadow: 0 6px 30px rgba(0,247,194,0.16);
-}
-
-/* Утилиты текста */
-.text-accent { color: var(--neon); }
-.text-default { color: var(--text); }
-.text-muted { color: var(--muted); }
-
-/* Мелкий текст — читаемый */
-.small {
-  font-size: 0.9rem;
-  line-height: 1.35;
-  color: var(--muted);
-}
-
-/* Тайтл карточки */
-.card-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-/* Вспомогательный placeholder для инпутов */
+/* Inputs */
 .input {
   background: rgba(255,255,255,0.02);
   border: 1px solid rgba(255,255,255,0.04);
-  padding: .6rem .75rem;
-  border-radius: 10px;
   color: var(--text);
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
 }
-
-/* Преобразование placeholder*/
 ::placeholder { color: rgba(230,255,249,0.45); }
 
-/* Стили для сообщений чата */
+/* Buttons */
+.btn-neon {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg font-semibold;
+  background: linear-gradient(90deg, rgba(0,245,255,0.08), rgba(0,179,152,0.04));
+  border: 1px solid var(--neon);
+  color: #001518;
+  padding: 0.45rem 0.9rem;
+}
+.btn-neon:hover { box-shadow: 0 10px 40px rgba(0,247,194,0.12); transform: translateY(-3px); }
+
+/* Message bubbles */
 .msg-user {
   background: linear-gradient(90deg, rgba(0,179,152,0.10), rgba(0,247,194,0.06));
-  color: #042523;
+  color: #021212;
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
 }
 .msg-assistant {
   background: rgba(1,12,10,0.75);
   color: var(--text);
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
 }
+
+/* Small/Muted text */
+.small { font-size: 0.9rem; color: var(--muted); line-height: 1.35; }
+.card-title { font-size: 1.125rem; font-weight: 700; color: var(--text); }
+
 
