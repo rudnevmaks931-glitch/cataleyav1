@@ -1,5 +1,5 @@
 // pages/dashboard.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
@@ -10,6 +10,12 @@ import { supabase } from "../lib/supabaseClient";
  * - Provider selection inside tab + settings
  * - Token/Tariff cards
  * - Chat area below (works with /api/chat)
+ *
+ * NOTE: Этот файл сохраняет исходную структуру — только исправлены ошибки:
+ * - везде используется profile.token_balance (а не tokens)
+ * - чат не отправит запрос, если баланс = 0
+ * - после пополнения/успешного ответа баланс обновляется из БД
+ * - цвета кнопок/текста скорректированы для читаемости
  */
 
 const TABS = [
@@ -74,6 +80,8 @@ export default function DashboardPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
+  const chatScrollRef = useRef(null);
+
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -85,6 +93,7 @@ export default function DashboardPage() {
       }
       setUser(usr);
 
+      // Загрузка профиля
       const { data: p, error } = await supabase
         .from("profiles")
         .select("*")
@@ -113,6 +122,22 @@ export default function DashboardPage() {
     init();
   }, [router]);
 
+  // Подгружает профиль заново (используется после изменений баланса/настроек)
+  async function refreshProfile() {
+    if (!user) return;
+    const { data: p, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    if (!error && p) {
+      setProfile(p);
+      // если в профиле изменился selected_model/settings — обновим локально
+      setSelectedProvider(p.selected_model ?? null);
+      setSettings(p.settings ?? {});
+    }
+  }
+
   async function saveSettingsToProfile(providerId, newSettings) {
     if (!user) return;
     setSavingSettings(true);
@@ -130,10 +155,8 @@ export default function DashboardPage() {
         console.error("Failed to save profile settings:", error);
         alert("Ошибка при сохранении настроек: " + error.message);
       } else {
-        const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-        setProfile(p);
-        setSelectedProvider(providerId);
-        setSettings(newSettings);
+        await refreshProfile();
+        // setSelectedProvider(providerId) и setSettings(newSettings) установятся в refreshProfile
       }
     } catch (err) {
       console.error(err);
@@ -158,8 +181,7 @@ export default function DashboardPage() {
       if (!res.ok) {
         alert("Ошибка пополнения: " + (data.error || JSON.stringify(data)));
       } else {
-        const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-        setProfile(p);
+        await refreshProfile();
         alert("Баланс обновлён: +" + amount + " токенов");
       }
     } catch (err) {
@@ -183,8 +205,25 @@ export default function DashboardPage() {
     }
   }
 
+  // Скролл чата вниз при обновлении сообщений
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      try {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight + 200;
+      } catch {}
+    }
+  }, [chatMessages]);
+
   async function sendChat() {
     if (!chatInput.trim()) return;
+
+    // проверка баланса
+    const balance = profile?.token_balance ?? 0;
+    if (balance <= 0) {
+      alert("Недостаточно токенов. Пополните баланс.");
+      return;
+    }
+
     const messageText = chatInput;
     setChatMessages(prev => [...prev, { role: "user", text: messageText }]);
     setChatInput("");
@@ -201,6 +240,8 @@ export default function DashboardPage() {
         setChatMessages(prev => [...prev, { role: "assistant", text: `⚠️ Ошибка: ${data.error || JSON.stringify(data)}` }]);
       } else {
         setChatMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
+        // обновим профиль (баланс) после успешного запроса
+        await refreshProfile();
       }
     } catch (err) {
       setChatMessages(prev => [...prev, { role: "assistant", text: `⚠️ Сетевая ошибка: ${err.message}` }]);
@@ -246,8 +287,8 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-3">
           <div className="text-sm text-muted hidden sm:block">Tokens: <span className="text-neon font-bold ml-2">{profile?.token_balance ?? 0}</span></div>
-          <button onClick={handleBuyTokensPrompt} className="bg-emerald-500 hover:bg-emerald-600 text-black px-3 py-2 rounded-md font-semibold">Buy</button>
-          <button onClick={handleLogout} className="px-3 py-2 rounded-md border border-white/10">Logout</button>
+          <button onClick={handleBuyTokensPrompt} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded-md font-semibold">Buy</button>
+          <button onClick={handleLogout} className="px-3 py-2 rounded-md border border-white/10 text-white">Logout</button>
         </div>
       </header>
 
@@ -273,7 +314,7 @@ export default function DashboardPage() {
             </li>
 
             <li>
-              <button onClick={handleBuyTokensPrompt} className="w-full mt-2 btn-neon">Пополнить</button>
+              <button onClick={handleBuyTokensPrompt} className="w-full mt-2 btn-neon text-white">Пополнить</button>
             </li>
 
             <li className="pt-4 border-t border-white/5">
@@ -283,7 +324,7 @@ export default function DashboardPage() {
                 <a className="text-[var(--text)]">⚡ Токены</a>
                 <a className="text-[var(--text)]">📝 Лента запросов</a>
                 <a className="text-[var(--text)]">🤝 Партнёрская программа</a>
-                <button onClick={handleLogout} className="mt-2 px-3 py-2 rounded-md border border-white/6 text-sm">Выход</button>
+                <button onClick={handleLogout} className="mt-2 px-3 py-2 rounded-md border border-white/6 text-sm text-white">Выход</button>
               </nav>
             </li>
           </ul>
@@ -303,7 +344,7 @@ export default function DashboardPage() {
               {(PROVIDERS[activeTab]?.items || []).map(p => (
                 <div key={p.id} className={`p-3 rounded-lg border ${profile?.selected_model === p.id ? 'border-emerald-400 bg-emerald-900/10' : 'border-white/5'} flex flex-col justify-between`}>
                   <div>
-                    <div className="font-semibold">{p.name}</div>
+                    <div className="font-semibold text-white">{p.name}</div>
                     <div className="text-sm text-muted mt-1">{p.desc}</div>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
@@ -403,7 +444,7 @@ export default function DashboardPage() {
 
             <div className="mt-4 flex gap-3">
               <button onClick={() => saveSettingsToProfile(profile?.selected_model ?? null, settings)} className="btn-neon" disabled={savingSettings}>Save settings</button>
-              <button onClick={() => { setSettings(profile?.settings ?? {}); }} className="px-3 py-2 rounded-md border border-white/6">Reset</button>
+              <button onClick={() => { setSettings(profile?.settings ?? {}); }} className="px-3 py-2 rounded-md border border-white/6 text-white">Reset</button>
             </div>
           </div>
 
@@ -426,14 +467,14 @@ export default function DashboardPage() {
                 <div className="text-sm text-muted">₽ / $</div>
               </div>
               <div className="mt-4">
-                <button onClick={handleBuyTokensPrompt} className="btn-neon">Buy tokens</button>
+                <button onClick={handleBuyTokensPrompt} className="btn-neon text-white">Buy tokens</button>
               </div>
             </div>
           </div>
 
           <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
             <div className="text-sm text-muted mb-2">Chat (powered by OpenAI)</div>
-            <div className="h-56 overflow-y-auto space-y-3 p-2 bg-neutral-950 rounded-md">
+            <div ref={chatScrollRef} className="h-56 overflow-y-auto space-y-3 p-2 bg-neutral-950 rounded-md">
               {chatMessages.length === 0 && <div className="text-sm text-muted">Нет сообщений — начните диалог</div>}
               {chatMessages.map((m, i) => (
                 <div key={i} className={`max-w-[85%] p-2 rounded-md ${m.role === "user" ? "ml-auto bg-emerald-500 text-black" : "bg-neutral-800 text-emerald-200"}`}>
@@ -453,9 +494,9 @@ export default function DashboardPage() {
           <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
             <div className="text-sm text-muted">Quick actions</div>
             <div className="mt-3 flex flex-col gap-2">
-              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left">История запросов</button>
-              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left">Экспорт</button>
-              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left">Безопасность</button>
+              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">История запросов</button>
+              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Экспорт</button>
+              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Безопасность</button>
             </div>
           </div>
 
@@ -470,3 +511,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
