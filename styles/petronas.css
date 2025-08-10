@@ -1,0 +1,66 @@
+:root {
+  --petronas-turquoise: #00E5B0;
+  --petronas-green: #00FFBF;
+  --graphite-dark: #1A1A1A;
+  --matte-black: #0A0A0A;
+  --carbon-grey: #262626;
+  --white-soft: #e5e5e5;
+}
+
+/* Общий фон */
+body {
+  background: radial-gradient(circle at 20% 30%, var(--graphite-dark) 0%, var(--matte-black) 40%, #000 100%),
+              linear-gradient(135deg, rgba(0, 229, 176, 0.08), rgba(0, 0, 0, 0) 70%);
+  color: var(--white-soft);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Панели */
+.panel {
+  background: linear-gradient(180deg, rgba(38, 38, 38, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%);
+  border: 1px solid rgba(0, 229, 176, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0, 229, 176, 0.2);
+}
+
+/* Неоновые кнопки */
+.btn-neon {
+  background: var(--petronas-turquoise);
+  color: var(--matte-black);
+  font-weight: bold;
+  padding: 10px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 229, 176, 0.6);
+}
+
+.btn-neon:hover {
+  background: var(--petronas-green);
+  box-shadow: 0 0 16px rgba(0, 255, 191, 0.8);
+}
+
+/* Иконки */
+.icon-btn {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  border-radius: 50%;
+  color: var(--petronas-turquoise);
+  transition: 0.3s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(0, 229, 176, 0.1);
+  box-shadow: 0 0 8px rgba(0, 229, 176, 0.6);
+}
+
+/* Чат */
+.chat-user {
+  background: var(--petronas-turquoise);
+  color: var(--matte-black);
+}
+
+.chat-assistant {
+  background: var(--carbon-grey);
+  color: var(--petronas-green);
+}
