@@ -654,72 +654,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </section>
-
-        {/* Right aside (original) - shown on mobile always, on lg only when rightMode === 'expanded' */}
-        <aside className={`col-span-12 lg:col-span-3 ${rightMode === 'expanded' ? 'lg:block' : 'lg:hidden'}`}>
-          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
-            <div className="text-sm text-muted">Quick actions</div>
-            <div className="mt-3 flex flex-col gap-2">
-              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">История запросов</button>
-              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Экспорт</button>
-              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Безопасность</button>
-            </div>
-          </div>
-
-          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6 mt-4">
-            <div className="text-sm text-muted">Поддержка</div>
-            <div className="mt-3 text-sm">
-              Вопросы по интеграции — <a href="mailto:you@cataleya.app" className="text-neon">you@cataleya.app</a>
-            </div>
-          </div>
-        </aside>
-
-        {/* Right narrow fixed strip when collapsed */}
-        {rightMode === "collapsed" && (
-          <div style={{ top: headerHeight }} className="fixed right-3 z-40">
-            <div className="flex flex-col items-center gap-3 py-3 bg-transparent rounded-md">
-              <button onClick={() => { alert('Requests (soon)'); openRightOverlay(); }} className="p-2 rounded-md" title="History">
-                <span className={neonIconClass}><Icon.Token /></span>
-              </button>
-              <button onClick={() => { alert('Export (soon)'); openRightOverlay(); }} className="p-2 rounded-md" title="Export">
-                <span className={neonIconClass}><Icon.Cog /></span>
-              </button>
-              <button onClick={() => { alert('Support'); openRightOverlay(); }} className="p-2 rounded-md" title="Support">
-                <span className={neonIconClass}><Icon.User /></span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Right overlay */}
-        {rightMode === "overlay" && (
-          <div style={{ top: headerHeight, right: 20, bottom: 20 }} className="fixed z-50 w-[360px] max-w-[90vw] glass rounded-xl border border-emerald-500/12 p-4 overflow-auto shadow-2xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold">Quick actions</div>
-              <div>
-                <button onClick={closeRightOverlay} className="px-2 py-1 rounded-md border border-white/6">Close</button>
-              </div>
-            </div>
-
-            <div className="text-sm text-muted">Возможности</div>
-            <div className="mt-3 flex flex-col gap-2">
-              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">История запросов</button>
-              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Экспорт</button>
-              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Безопасность</button>
-            </div>
-
-            <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6 mt-4">
-              <div className="text-sm text-muted">Поддержка</div>
-              <div className="mt-3 text-sm">
-                Вопросы по интеграции — <a href="mailto:you@cataleya.app" className="text-neon">you@cataleya.app</a>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );
 }
-
 
 
