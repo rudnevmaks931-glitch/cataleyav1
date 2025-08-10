@@ -1,56 +1,43 @@
 // pages/api/chat.js
-import { serverSupabase } from "../../lib/serverSupabase";
-import { callOpenAIChat } from "../../lib/openai";
-
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  const { user_id, messages } = req.body;
-  if (!user_id || !messages) return res.status(400).json({ error: "Missing user_id or messages" });
+  const { message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: "No message provided" });
+  }
 
   try {
-    // fetch profile
-    const { data: profile, error: pErr } = await serverSupabase
-      .from("profiles")
-      .select("id, token_balance")
-      .eq("id", user_id)
-      .single();
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Ты помощник, отвечай кратко и по делу." },
+          { role: "user", content: message },
+        ],
+        temperature: 0.7,
+      }),
+    });
 
-    if (pErr || !profile) return res.status(404).json({ error: "Profile not found" });
+    const data = await response.json();
 
-    const cost = parseInt(process.env.NEXT_PUBLIC_CHAT_COST || "1", 10);
-    if (profile.token_balance < cost) {
-      return res.status(402).json({ error: "Insufficient tokens" });
+    if (data.error) {
+      return res.status(500).json({ error: data.error.message });
     }
 
-    const { content, usage, raw } = await callOpenAIChat(messages);
-
-    // deduct tokens
-    await serverSupabase
-      .from("profiles")
-      .update({ token_balance: profile.token_balance - cost })
-      .eq("id", user_id);
-
-    // record transaction
-    await serverSupabase.from("transactions").insert({
-      user_id,
-      amount: -cost,
-      type: "debit",
-      description: "Chat request"
+    res.status(200).json({
+      reply: data.choices[0].message.content.trim(),
     });
-
-    // record request
-    await serverSupabase.from("requests").insert({
-      user_id,
-      ai_type: "chat",
-      input: JSON.stringify(messages),
-      output: content,
-      cost
-    });
-
-    return res.status(200).json({ reply: content, usage });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message || "Server error" });
+    res.status(500).json({ error: err.message });
   }
 }
+
