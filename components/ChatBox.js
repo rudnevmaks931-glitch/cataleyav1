@@ -2,29 +2,50 @@
 import { useState, useEffect, useRef } from "react";
 
 export default function ChatBox({ user, initialSystem = "You are Cataleya, an expert AI assistant." }) {
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([{ role: "system", content: initialSystem }]);
-  const [loading, setLoading] = useState(false);
+  const [input, setInput] = useState(""); // Состояние для ввода текста
+  const [messages, setMessages] = useState([{ role: "system", content: initialSystem }]); // Сообщения в чате
+  const [loading, setLoading] = useState(false); // Индикатор загрузки
   const ref = useRef();
 
+  // Прокручиваем чат вниз, когда новые сообщения добавляются
   useEffect(() => {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   }, [messages]);
 
+  // Функция отправки сообщения
   async function send() {
-    if (!input.trim()) return;
+    if (!input.trim()) return; // Если поле ввода пустое, не отправляем
+
+    // Добавляем сообщение пользователя в список сообщений
     const userMsg = { role: "user", content: input };
     const next = [...messages, userMsg];
     setMessages(next);
-    setInput("");
-    setLoading(true);
+    setInput(""); // Очищаем поле ввода
+    setLoading(true); // Включаем индикатор загрузки
+
+    // Проверяем, что user.id существует
+    if (!user || !user.id) {
+      setMessages(prev => [...prev, { role: "assistant", content: "Ошибка: не найден ID пользователя." }]);
+      setLoading(false);
+      return;
+    }
+
+    // Проверяем, что сообщения не пустые
+    if (!next || next.length === 0) {
+      setMessages(prev => [...prev, { role: "assistant", content: "Ошибка: нет сообщений для отправки." }]);
+      setLoading(false);
+      return;
+    }
 
     try {
+      // Отправляем запрос на сервер
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id, messages: next })
       });
+
+      // Обработка ответа от сервера
       const data = await res.json();
       if (res.ok) {
         setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
@@ -32,9 +53,11 @@ export default function ChatBox({ user, initialSystem = "You are Cataleya, an ex
         setMessages(prev => [...prev, { role: "assistant", content: `Ошибка: ${data.error || 'server'}` }]);
       }
     } catch (err) {
+      // Обработка сетевой ошибки
       setMessages(prev => [...prev, { role: "assistant", content: "Ошибка сети. Попробуйте позже." }]);
     }
-    setLoading(false);
+
+    setLoading(false); // Выключаем индикатор загрузки
   }
 
   return (
@@ -53,15 +76,20 @@ export default function ChatBox({ user, initialSystem = "You are Cataleya, an ex
       <div className="flex gap-3 items-center">
         <textarea
           value={input}
-          onChange={e => setInput(e.target.value)}
-          className="input flex-1 resize-none h-12 rounded-md"
-          placeholder="Напиши запрос для Cataleya..."
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+          onChange={(e) => setInput(e.target.value)}
+          rows={3}
+          className="w-full p-3 border border-gray-300 rounded-lg"
+          placeholder="Введите сообщение..."
         />
-        <button onClick={send} disabled={loading} className="btn-neon">
-          {loading ? "..." : "Send"}
+        <button
+          onClick={send}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+          disabled={loading}
+        >
+          {loading ? "Отправка..." : "Отправить"}
         </button>
       </div>
     </div>
   );
 }
+
