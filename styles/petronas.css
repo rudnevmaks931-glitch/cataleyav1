@@ -1,66 +1,71 @@
 :root {
-  --petronas-turquoise: #00E5B0;
-  --petronas-green: #00FFBF;
-  --graphite-dark: #1A1A1A;
-  --matte-black: #0A0A0A;
-  --carbon-grey: #262626;
-  --white-soft: #e5e5e5;
+  --petronas-green: #00f0a8;
+  --petronas-green-dark: #00c48a;
+  --petronas-gray-dark: #0a0a0a;
+  --petronas-gray: #1a1a1a;
+  --text-light: #ffffff;
+  --text-muted: #7f8c8d;
 }
 
-/* Общий фон */
 body {
-  background: radial-gradient(circle at 20% 30%, var(--graphite-dark) 0%, var(--matte-black) 40%, #000 100%),
-              linear-gradient(135deg, rgba(0, 229, 176, 0.08), rgba(0, 0, 0, 0) 70%);
-  color: var(--white-soft);
+  background: linear-gradient(180deg, var(--petronas-gray-dark) 0%, var(--petronas-gray) 100%);
+  color: var(--text-light);
   font-family: 'Inter', sans-serif;
 }
 
-/* Панели */
-.panel {
-  background: linear-gradient(180deg, rgba(38, 38, 38, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%);
-  border: 1px solid rgba(0, 229, 176, 0.15);
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 229, 176, 0.2);
-}
-
-/* Неоновые кнопки */
-.btn-neon {
-  background: var(--petronas-turquoise);
-  color: var(--matte-black);
-  font-weight: bold;
-  padding: 10px 16px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  box-shadow: 0 0 10px rgba(0, 229, 176, 0.6);
-}
-
-.btn-neon:hover {
-  background: var(--petronas-green);
-  box-shadow: 0 0 16px rgba(0, 255, 191, 0.8);
-}
-
-/* Иконки */
-.icon-btn {
+.btn-petronas {
   background: transparent;
-  border: none;
-  padding: 8px;
-  border-radius: 50%;
-  color: var(--petronas-turquoise);
-  transition: 0.3s ease;
-}
-
-.icon-btn:hover {
-  background: rgba(0, 229, 176, 0.1);
-  box-shadow: 0 0 8px rgba(0, 229, 176, 0.6);
-}
-
-/* Чат */
-.chat-user {
-  background: var(--petronas-turquoise);
-  color: var(--matte-black);
-}
-
-.chat-assistant {
-  background: var(--carbon-grey);
+  border: 1px solid var(--petronas-green);
   color: var(--petronas-green);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.25s ease-in-out;
+}
+
+.btn-petronas:hover {
+  background: var(--petronas-green);
+  color: var(--petronas-gray-dark);
+}
+
+.btn-petronas-solid {
+  background: var(--petronas-green);
+  border: 1px solid var(--petronas-green);
+  color: var(--petronas-gray-dark);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.25s ease-in-out;
+}
+
+.btn-petronas-solid:hover {
+  background: var(--petronas-green-dark);
+}
+
+.btn-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.input {
+  background: #111;
+  border: 1px solid #333;
+  color: var(--text-light);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-neon {
+  color: var(--petronas-green);
+}
+
+.glass {
+  backdrop-filter: blur(10px);
+  background: rgba(20, 20, 20, 0.7);
 }
