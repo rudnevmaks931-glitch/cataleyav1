@@ -1,71 +1,112 @@
-:root {
-  --petronas-green: #00f0a8;
-  --petronas-green-dark: #00c48a;
-  --petronas-gray-dark: #0a0a0a;
-  --petronas-gray: #1a1a1a;
-  --text-light: #ffffff;
-  --text-muted: #7f8c8d;
+:root{
+  --petronas-turquoise: #00E5B0;
+  --petronas-green: #00FFBF;
+  --petronas-green-dark: #00C48A;
+  --graphite-dark: #1A1A1A;
+  --matte-black: #0A0A0A;
+  --carbon-grey: #262626;
+  --white-soft: #e5e5e5;
+  --muted: #8b98a0;
 }
 
+/* Фон в стиле болида: графит -> матовый чёрный + лёгкий бирюзовый отлив */
 body {
-  background: linear-gradient(180deg, var(--petronas-gray-dark) 0%, var(--petronas-gray) 100%);
-  color: var(--text-light);
-  font-family: 'Inter', sans-serif;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(26,26,26,1) 0%, rgba(10,10,10,1) 40%, #000 100%),
+    linear-gradient(135deg, rgba(0,229,176,0.05), rgba(0,0,0,0) 70%);
+  color: var(--white-soft);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.btn-petronas {
+/* Панели (glass effect) */
+.glass {
+  background: linear-gradient(180deg, rgba(18,18,18,0.72), rgba(10,10,10,0.6));
+  border: 1px solid rgba(0, 255, 191, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+}
+
+/* Текстовые утилиты */
+.text-muted { color: var(--muted); }
+.text-neon { color: var(--petronas-turquoise); }
+
+/* Inputs */
+.input {
+  background: #0f0f0f;
+  border: 1px solid rgba(255,255,255,0.04);
+  color: var(--white-soft);
+  padding: 8px 10px;
+  border-radius: 8px;
+  outline: none;
+}
+.input:focus {
+  box-shadow: 0 0 12px rgba(0, 255, 191, 0.06);
+  border-color: var(--petronas-turquoise);
+}
+
+/* Кнопки Petronas:
+   - default: outline neon (readable neon text)
+   - filled: neon background with dark text */
+.btn-neon {
   background: transparent;
-  border: 1px solid var(--petronas-green);
-  color: var(--petronas-green);
-  padding: 8px 14px;
-  border-radius: 6px;
+  border: 1px solid var(--petronas-turquoise);
+  color: var(--petronas-turquoise);
+  padding: 8px 12px;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.9rem;
-  transition: all 0.25s ease-in-out;
+  transition: all 180ms ease;
+  cursor: pointer;
+}
+.btn-neon:hover {
+  background: linear-gradient(180deg, var(--petronas-turquoise), var(--petronas-green));
+  color: #061210; /* dark content color for contrast */
+  box-shadow: 0 6px 24px rgba(0,255,191,0.14), 0 0 10px rgba(0,255,191,0.08) inset;
 }
 
-.btn-petronas:hover {
-  background: var(--petronas-green);
-  color: var(--petronas-gray-dark);
-}
-
-.btn-petronas-solid {
-  background: var(--petronas-green);
-  border: 1px solid var(--petronas-green);
-  color: var(--petronas-gray-dark);
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  transition: all 0.25s ease-in-out;
-}
-
-.btn-petronas-solid:hover {
-  background: var(--petronas-green-dark);
-}
-
-.btn-disabled {
-  opacity: 0.5;
+/* Disabled state */
+.btn-disabled, .btn-neon[disabled] {
+  opacity: 0.45;
   pointer-events: none;
 }
 
-.input {
-  background: #111;
-  border: 1px solid #333;
-  color: var(--text-light);
-  padding: 6px 10px;
-  border-radius: 6px;
+/* Solid neon button (use when button is meant to be filled by default) */
+.btn-neon-solid {
+  background: linear-gradient(180deg, var(--petronas-turquoise), var(--petronas-green));
+  color: #061210;
+  border: 1px solid var(--petronas-green-dark);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn-neon-solid:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, var(--petronas-green), var(--petronas-green-dark));
+  box-shadow: 0 10px 40px rgba(0,255,191,0.18);
 }
 
-.text-muted {
-  color: var(--text-muted);
+/* Small helpers */
+.kv { color: var(--petronas-turquoise); font-weight:700; }
+.card-title { font-weight:700; color:var(--white-soft); }
+
+/* Chat bubbles */
+.chat-user {
+  background: linear-gradient(180deg, rgba(0,229,176,0.12), rgba(0,229,176,0.06));
+  color: #061210;
+  border-radius: 10px;
+  padding: 8px;
+}
+.chat-assistant {
+  background: rgba(255,255,255,0.03);
+  color: var(--white-soft);
+  border-radius: 10px;
+  padding: 8px;
 }
 
-.text-neon {
-  color: var(--petronas-green);
-}
-
-.glass {
-  backdrop-filter: blur(10px);
-  background: rgba(20, 20, 20, 0.7);
+/* Small responsive tweaks */
+@media (max-width: 1024px) {
+  .glass { border-radius: 10px; }
+  .btn-neon, .btn-neon-solid { padding: 7px 10px; }
 }
