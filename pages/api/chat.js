@@ -1,43 +1,64 @@
 // pages/api/chat.js
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { message } = req.body;
+  const { userId, message } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: "No message provided" });
+  if (!userId || !message) {
+    return res.status(400).json({ error: "Missing userId or message" });
+  }
+
+  // 1. Проверяем баланс токенов
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("tokens")
+    .eq("id", userId)
+    .single();
+
+  if (profileError || !profile) {
+    return res.status(500).json({ error: "User not found" });
+  }
+
+  if (profile.tokens <= 0) {
+    return res.status(403).json({ error: "Not enough tokens" });
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // 2. Отправляем запрос в OpenAI
+    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Ты помощник, отвечай кратко и по делу." },
-          { role: "user", content: message },
-        ],
-        temperature: 0.7,
+        model: "gpt-4o-mini", // быстрый и дешевле, можно gpt-4.1
+        messages: [{ role: "user", content: message }],
+        max_tokens: 500,
       }),
     });
 
-    const data = await response.json();
+    const aiData = await aiRes.json();
+    const reply = aiData.choices?.[0]?.message?.content || "Ошибка ответа ИИ";
 
-    if (data.error) {
-      return res.status(500).json({ error: data.error.message });
-    }
+    // 3. Списываем токен
+    await supabase
+      .from("profiles")
+      .update({ tokens: profile.tokens - 1 })
+      .eq("id", userId);
 
-    res.status(200).json({
-      reply: data.choices[0].message.content.trim(),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    // 4. Возвращаем ответ
+    return res.status(200).json({ reply });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 }
-
