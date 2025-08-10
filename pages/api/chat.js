@@ -4,7 +4,14 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const { message, user_id } = req.body;
 
-    // Проверяем баланс токенов
+    // Проверяем, что message и user_id получены
+    if (!message || !user_id) {
+      return res.status(400).json({
+        error: "Missing userId or message",
+      });
+    }
+
+    // Проверка баланса токенов
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("token_balance")
@@ -18,7 +25,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      // Запрос к ChatGPT API
+      // Запрос к OpenAI API
       const openaiResponse = await fetch("https://api.openai.com/v1/completions", {
         method: "POST",
         headers: {
@@ -36,14 +43,14 @@ export default async function handler(req, res) {
       const data = await openaiResponse.json();
       const reply = data.choices[0]?.text || "Ошибка при обработке запроса.";
 
-      // Возвращаем ответ
-      res.status(200).json({ reply });
-
-      // Уменьшаем токены на 1 за каждое использование
+      // Уменьшаем количество токенов
       await supabase
         .from("profiles")
         .update({ token_balance: profile.token_balance - 1 })
         .eq("id", user_id);
+
+      // Возвращаем ответ
+      res.status(200).json({ reply });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Произошла ошибка при обработке запроса." });
@@ -53,4 +60,3 @@ export default async function handler(req, res) {
   }
 }
 
-}
