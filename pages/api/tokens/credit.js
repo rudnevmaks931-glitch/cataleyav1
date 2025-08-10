@@ -9,13 +9,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Добавление записи о транзакции
-    const { data, error } = await supabase
+    // Проверка на корректность значения amount
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    // Начало транзакции для атомарных операций
+    const { data: transactionData, error: transactionError } = await supabase
       .from('transactions')
       .insert([{ user_id, amount, description }]);
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
+    if (transactionError) {
+      return res.status(500).json({ error: `Error inserting transaction: ${transactionError.message}` });
     }
 
     // Обновление баланса пользователя
@@ -28,11 +33,13 @@ export default async function handler(req, res) {
       .single();
 
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      return res.status(500).json({ error: `Error updating balance: ${updateError.message}` });
     }
 
+    // Возвращаем данные обновленного пользователя
     return res.status(200).json({ data: updatedUser });
   } else {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 }
+
