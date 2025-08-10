@@ -10,8 +10,6 @@ import { supabase } from "../lib/supabaseClient";
  * - Provider selection inside tab + settings
  * - Token/Tariff cards
  * - Chat area below (works with /api/chat)
- *
- * Зависит от: lib/supabaseClient.js (supabase client v2)
  */
 
 const TABS = [
@@ -22,7 +20,6 @@ const TABS = [
   { id: "audio", label: "Audio" }
 ];
 
-// providers and default settings per tab
 const PROVIDERS = {
   chat: {
     title: "Chat providers",
@@ -77,7 +74,6 @@ export default function DashboardPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
-  // --- load user and profile ---
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -89,7 +85,6 @@ export default function DashboardPage() {
       }
       setUser(usr);
 
-      // fetch profile
       const { data: p, error } = await supabase
         .from("profiles")
         .select("*")
@@ -97,7 +92,6 @@ export default function DashboardPage() {
         .single();
 
       if (error || !p) {
-        // create profile if not exist
         const initProfile = {
           id: usr.id,
           username: usr.email,
@@ -119,7 +113,6 @@ export default function DashboardPage() {
     init();
   }, [router]);
 
-  // --- helper: persist settings to profile ---
   async function saveSettingsToProfile(providerId, newSettings) {
     if (!user) return;
     setSavingSettings(true);
@@ -137,7 +130,6 @@ export default function DashboardPage() {
         console.error("Failed to save profile settings:", error);
         alert("Ошибка при сохранении настроек: " + error.message);
       } else {
-        // refresh profile
         const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
         setProfile(p);
         setSelectedProvider(providerId);
@@ -151,7 +143,6 @@ export default function DashboardPage() {
     }
   }
 
-  // --- Buy tokens (test endpoint) ---
   async function handleBuyTokensPrompt() {
     if (!user) return alert("User not found");
     const amountStr = prompt("Сколько токенов добавить? (например 100)");
@@ -167,7 +158,6 @@ export default function DashboardPage() {
       if (!res.ok) {
         alert("Ошибка пополнения: " + (data.error || JSON.stringify(data)));
       } else {
-        // refresh balance
         const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
         setProfile(p);
         alert("Баланс обновлён: +" + amount + " токенов");
@@ -178,18 +168,13 @@ export default function DashboardPage() {
     }
   }
 
-  // --- selecting provider in UI ---
   function onSelectProvider(providerId) {
-    // apply defaults for this tab/provider if no settings exist
     const [tabKey] = providerId.split(":");
     const providerDefaults = PROVIDERS[tabKey]?.defaults ?? {};
-    // if current profile.settings has matching provider, use it
     const curSettings = (profile && profile.selected_model === providerId && profile.settings) ? profile.settings : providerDefaults;
-    // save to server
     saveSettingsToProfile(providerId, curSettings);
   }
 
-  // --- update a single setting field locally (and optionally save) ---
   function updateSettingField(key, value, autosave = false) {
     const newSettings = { ...(settings || {}), [key]: value };
     setSettings(newSettings);
@@ -198,7 +183,6 @@ export default function DashboardPage() {
     }
   }
 
-  // --- Chat send (uses /api/chat) ---
   async function sendChat() {
     if (!chatInput.trim()) return;
     const messageText = chatInput;
@@ -225,13 +209,11 @@ export default function DashboardPage() {
     }
   }
 
-  // --- logout ---
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/login");
   }
 
-  // --- simple UI render while loading ---
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white bg-black">
@@ -242,17 +224,14 @@ export default function DashboardPage() {
     );
   }
 
-  // --- render ---
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#040404] to-[#080808] text-white">
-      {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-emerald-500/6">
         <div className="flex items-center gap-4">
           <div className="text-2xl font-extrabold text-neon">CATALeya</div>
           <div className="text-sm text-muted hidden md:block">AI hub — Dashboard</div>
         </div>
 
-        {/* Top model tabs */}
         <nav className="flex items-center gap-2">
           {TABS.map(t => (
             <button
@@ -272,9 +251,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Body */}
       <main className="p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left sidebar */}
         <aside className="lg:col-span-3 bg-gray-900/60 glass p-5 rounded-xl border border-emerald-500/6">
           <div className="mb-6">
             <div className="text-sm text-muted">Профиль</div>
@@ -312,9 +289,7 @@ export default function DashboardPage() {
           </ul>
         </aside>
 
-        {/* Main content */}
         <section className="lg:col-span-6 space-y-6">
-          {/* Providers block */}
           <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -345,14 +320,12 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Settings panel */}
           <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
             <div className="flex items-center justify-between mb-3">
               <div className="font-semibold">Настройки — {activeTab}</div>
               <div className="text-sm text-muted">Provider: <span className="text-neon ml-2">{profile?.selected_model ?? "—"}</span></div>
             </div>
 
-            {/* dynamic settings for each tab */}
             <div className="space-y-3">
               {activeTab === "chat" && (
                 <>
@@ -434,7 +407,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Tariff & Promo cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
               <div className="text-sm text-muted">Тариф</div>
@@ -459,7 +431,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Chat area (main) */}
           <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
             <div className="text-sm text-muted mb-2">Chat (powered by OpenAI)</div>
             <div className="h-56 overflow-y-auto space-y-3 p-2 bg-neutral-950 rounded-md">
@@ -478,7 +449,6 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Right column */}
         <aside className="lg:col-span-3 space-y-6">
           <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
             <div className="text-sm text-muted">Quick actions</div>
@@ -499,34 +469,4 @@ export default function DashboardPage() {
       </main>
     </div>
   );
-
-  // helper inside
-  function sendChat() {
-    // wrapper to use current chatInput state
-    // uses sendChat async declared above
-    void (async () => {
-      if (!chatInput?.trim()) return;
-      const text = chatInput;
-      setChatMessages(prev => [...prev, { role: "user", text }]);
-      setChatInput("");
-      setChatLoading(true);
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, user_id: user?.id })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setChatMessages(prev => [...prev, { role: "assistant", text: `⚠️ Ошибка: ${data.error || JSON.stringify(data)}` }]);
-        } else {
-          setChatMessages(prev => [...prev, { role: "assistant", text: data.reply }]);
-        }
-      } catch (err) {
-        setChatMessages(prev => [...prev, { role: "assistant", text: `⚠️ Сетевая ошибка: ${err.message}` }]);
-      } finally {
-        setChatLoading(false);
-      }
-    })();
-  }
 }
