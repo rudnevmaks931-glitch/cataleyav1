@@ -1,5 +1,4 @@
 // next.config.js
-
 module.exports = {
-  reactStrictMode: true, // Включение строгого режима React
+  reactStrictMode: true,  // Включаем строгий режим для React
 };
