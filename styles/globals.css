@@ -2,14 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #0a0a0a;
-  color: #00f7c2;
-  font-family: sans-serif;
+/* Основные настройки темы */
+:root {
+  --neon: #00f7c2;
+}
+
+html, body, #__next {
+  height: 100%;
+  background: linear-gradient(180deg, #030303 0%, #070707 100%);
+  color: #d6fff8;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10,10,10,0.55);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid rgba(0,247,194,0.12);
+  border-radius: 14px;
+  box-shadow: 0 6px 30px rgba(0,247,194,0.03);
+}
+
+.neon-btn {
+  background: linear-gradient(90deg, rgba(0,247,194,0.08), rgba(0,179,152,0.06));
+  border: 1px solid var(--neon);
+  color: #00110f;
+  padding: .55rem .9rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.neon-btn:hover {
+  box-shadow: 0 0 18px rgba(0,247,194,0.2);
+  transform: translateY(-2px);
 }
