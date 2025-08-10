@@ -4,13 +4,11 @@ import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 /**
- * Cataleya Dashboard (restored + enhancements)
- * - Left & Right collapsible sidebars with neon SVG icons
- * - Narrow icon strips when collapsed (mobile friendly)
- * - Central workspace expands when sidebars collapsed
- * - Preserves all previous functionality (profiles, providers, settings, chat, tokens)
- *
- * Uses existing project styles: .glass, .btn-neon, .input, .text-neon etc.
+ * Cataleya Dashboard (overlay sidebars)
+ * - Left & Right overlays that appear above content (do not push layout)
+ * - Collapsed narrow icon strips at edges
+ * - Header preserved
+ * - All original functionality preserved (profile, providers, settings, chat, tokens)
  */
 
 const TABS = [
@@ -71,15 +69,29 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState({});
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // chat
-  const [chatMessages, setChatMessages] = useState([]); // chat area
+  // Chat
+  const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatScrollRef = useRef(null);
 
-  // sidebar collapse state
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  // Header height (for overlay top offset)
+  const headerRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(76);
+
+  // Sidebar modes: "expanded" (original grid aside visible), "collapsed" (show narrow fixed strip), "overlay" (fixed full overlay)
+  const [leftMode, setLeftMode] = useState("expanded");
+  const [rightMode, setRightMode] = useState("expanded");
+
+  useEffect(() => {
+    const setHeader = () => {
+      const h = headerRef.current?.offsetHeight ?? 76;
+      setHeaderHeight(h + 12); // small gap
+    };
+    setHeader();
+    window.addEventListener("resize", setHeader);
+    return () => window.removeEventListener("resize", setHeader);
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -120,7 +132,6 @@ export default function DashboardPage() {
     init();
   }, [router]);
 
-  // refresh profile after changes
   async function refreshProfile() {
     if (!user) return;
     const { data: p, error } = await supabase
@@ -241,25 +252,28 @@ export default function DashboardPage() {
     router.push("/login");
   }
 
-  // Toggle functions for sidebars
+  // Left/Right mode helpers
   function toggleLeft() {
-    setLeftCollapsed(!leftCollapsed);
+    setLeftMode((m) => (m === "expanded" ? "collapsed" : "expanded"));
   }
+  function openLeftOverlay() {
+    setLeftMode("overlay");
+  }
+  function closeLeftOverlay() {
+    setLeftMode("collapsed");
+  }
+
   function toggleRight() {
-    setRightCollapsed(!rightCollapsed);
+    setRightMode((m) => (m === "expanded" ? "collapsed" : "expanded"));
+  }
+  function openRightOverlay() {
+    setRightMode("overlay");
+  }
+  function closeRightOverlay() {
+    setRightMode("collapsed");
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white bg-black">
-        <div className="text-center">
-          <div className="animate-pulse text-neon text-2xl">Загрузка Dashboard...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // SVG icon components (neon style)
+  // Neon SVG icons
   const Icon = {
     Chat: ({ className = "w-5 h-5" }) => (
       <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -275,7 +289,6 @@ export default function DashboardPage() {
     Cog: ({ className = "w-5 h-5" }) => (
       <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg" aria-hidden>
         <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.27 16.9l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82L4.27 2.27A2 2 0 1 1 7.1 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10 0.88V1a2 2 0 1 1 4 0v.12c.11.57.46 1.09 1 1.51.54.41 1.2.56 1.82.33l.06-.06A2 2 0 1 1 21.73 7.1l-.06.06a1.65 1.65 0 0 0-.33 1.82c.22.62.07 1.28-.33 1.82-.42.54-.95.89-1.51 1V15a2 2 0 1 1-4 0v-.12c-.11-.57-.46-1.09-1-1.51z" stroke="currentColor" strokeWidth="0" strokeLinecap="round" strokeLinejoin="round" opacity="0.0"/>
       </svg>
     ),
     Token: ({ className = "w-5 h-5" }) => (
@@ -286,110 +299,199 @@ export default function DashboardPage() {
     )
   };
 
-  // classes for neon icons (uses CSS variable --neon if present)
   const neonIconClass = "text-neon hover:scale-110 transition-transform duration-200";
+
+  // Central column span depending on which sidebars are shown (only lg breakpoint)
+  let centralSpanClass = "lg:col-span-6";
+  const leftExpanded = leftMode === "expanded";
+  const rightExpanded = rightMode === "expanded";
+  if (!leftExpanded && !rightExpanded) centralSpanClass = "lg:col-span-12";
+  else if (!leftExpanded && rightExpanded) centralSpanClass = "lg:col-span-9";
+  else if (leftExpanded && !rightExpanded) centralSpanClass = "lg:col-span-9";
+  else centralSpanClass = "lg:col-span-6";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white bg-black">
+        <div className="text-center">
+          <div className="animate-pulse text-neon text-2xl">Загрузка Dashboard...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#040404] to-[#080808] text-white relative">
-      {/* Left edge toggle button (fixed) */}
+      {/* Header */}
+      <header ref={headerRef} className="flex items-center justify-between px-6 py-4 border-b border-emerald-500/6 bg-transparent z-10">
+        <div className="flex items-center gap-4">
+          <div className="text-2xl font-extrabold text-neon">CATALeya</div>
+          <div className="text-sm text-muted hidden md:block">AI hub — Dashboard</div>
+        </div>
+
+        <nav className="flex items-center gap-2">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === t.id ? 'bg-emerald-700/40 border border-emerald-500' : 'text-[var(--muted)] hover:text-white'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted hidden sm:block">Tokens: <span className="text-neon font-bold ml-2">{profile?.token_balance ?? 0}</span></div>
+          <button onClick={handleBuyTokensPrompt} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded-md font-semibold">Buy</button>
+          <button onClick={handleLogout} className="px-3 py-2 rounded-md border border-white/10 text-white">Logout</button>
+        </div>
+      </header>
+
+      {/* Left toggle fixed at left edge */}
       <button
         onClick={toggleLeft}
-        aria-label={leftCollapsed ? "Expand left" : "Collapse left"}
-        className="fixed left-2 top-1/2 z-50 transform -translate-y-1/2 bg-transparent p-2 rounded-md hover:scale-105 transition"
+        aria-label="Toggle left"
+        className="fixed left-3 top-1/2 z-50 transform -translate-y-1/2 bg-transparent p-1 rounded-md hover:scale-105 transition"
       >
         <div className="w-10 h-10 flex items-center justify-center rounded-md" style={{ boxShadow: "0 6px 20px rgba(0,255,174,0.08)" }}>
           <svg viewBox="0 0 24 24" className="w-6 h-6 text-neon">
-            {leftCollapsed ? (
-              <path d="M8 5l8 7-8 7V5z" fill="currentColor"/>
-            ) : (
+            {leftMode === "expanded" ? (
               <path d="M16 5L8 12l8 7V5z" fill="currentColor"/>
+            ) : (
+              <path d="M8 5l8 7-8 7V5z" fill="currentColor"/>
             )}
           </svg>
         </div>
       </button>
 
-      {/* Right edge toggle button (fixed) */}
+      {/* Right toggle fixed at right edge */}
       <button
         onClick={toggleRight}
-        aria-label={rightCollapsed ? "Expand right" : "Collapse right"}
-        className="fixed right-2 top-1/2 z-50 transform -translate-y-1/2 bg-transparent p-2 rounded-md hover:scale-105 transition"
+        aria-label="Toggle right"
+        className="fixed right-3 top-1/2 z-50 transform -translate-y-1/2 bg-transparent p-1 rounded-md hover:scale-105 transition"
       >
         <div className="w-10 h-10 flex items-center justify-center rounded-md" style={{ boxShadow: "0 6px 20px rgba(0,255,174,0.08)" }}>
           <svg viewBox="0 0 24 24" className="w-6 h-6 text-neon">
-            {rightCollapsed ? (
-              <path d="M16 5l-8 7 8 7V5z" fill="currentColor"/>
-            ) : (
+            {rightMode === "expanded" ? (
               <path d="M8 5l8 7-8 7V5z" fill="currentColor"/>
+            ) : (
+              <path d="M16 5l-8 7 8 7V5z" fill="currentColor"/>
             )}
           </svg>
         </div>
       </button>
 
       <main className="p-6 max-w-7xl mx-auto grid grid-cols-12 gap-6">
-        {/* Left sidebar */}
-        <aside className={`col-span-12 lg:col-span-3 transition-all duration-300 ${leftCollapsed ? 'w-16 lg:w-16' : 'w-full lg:w-auto'}`}>
-
-          <div className={`flex ${leftCollapsed ? 'justify-center' : ''}`}>
-            <div className={`${leftCollapsed ? 'w-16' : 'w-full'} ${leftCollapsed ? '' : 'glass'} rounded-xl overflow-hidden`}>
-              {/* Collapsed narrow icon column */}
-              {leftCollapsed ? (
-                <div className="flex flex-col items-center gap-4 py-4">
-                  <button onClick={() => setActiveTab('chat')} className="p-2 rounded-md hover:scale-110 transition" title="Chat">
-                    <span className={`${neonIconClass}`}><Icon.Chat /></span>
-                  </button>
-                  <button onClick={() => setActiveTab('profile')} className="p-2 rounded-md hover:scale-110 transition" title="Profile">
-                    <span className={`${neonIconClass}`}><Icon.User /></span>
-                  </button>
-                  <button onClick={() => setActiveTab('image')} className="p-2 rounded-md hover:scale-110 transition" title="Images">
-                    <span className={`${neonIconClass}`}><Icon.Token /></span>
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-gray-900/60 glass p-5 rounded-xl border border-emerald-500/6">
-                  <div className="mb-6">
-                    <div className="text-sm text-muted">Профиль</div>
-                    <div className="mt-2 font-semibold text-[var(--text)] break-words">{user?.email}</div>
-                  </div>
-
-                  <ul className="space-y-3 text-sm">
-                    <li className="flex items-center justify-between">
-                      <div>
-                        <div className="text-muted">Тариф</div>
-                        <div className="font-semibold">FREE</div>
-                      </div>
-                      <div className="text-sm text-neon font-bold">Free</div>
-                    </li>
-
-                    <li>
-                      <div className="text-muted">Баланс токенов</div>
-                      <div className="text-neon font-bold text-xl">{profile?.token_balance ?? 0}</div>
-                    </li>
-
-                    <li>
-                      <button onClick={handleBuyTokensPrompt} className="w-full mt-2 btn-neon text-white">Пополнить</button>
-                    </li>
-
-                    <li className="pt-4 border-t border-white/5">
-                      <nav className="flex flex-col gap-2 text-sm">
-                        <a className="text-[var(--text)]">📌 Профиль</a>
-                        <a className="text-[var(--text)]">⭐ Подписка</a>
-                        <a className="text-[var(--text)]">⚡ Токены</a>
-                        <a className="text-[var(--text)]">📝 Лента запросов</a>
-                        <a className="text-[var(--text)]">🤝 Партнёрская программа</a>
-                        <button onClick={handleLogout} className="mt-2 px-3 py-2 rounded-md border border-white/6 text-sm text-white">Выход</button>
-                      </nav>
-                    </li>
-                  </ul>
-                </div>
-              )}
+        {/* Left aside (original layout) - shown on mobile always, on lg only when leftMode === 'expanded' */}
+        <aside className={`col-span-12 lg:col-span-3 ${leftMode === 'expanded' ? 'lg:block' : 'lg:hidden'}`}>
+          <div className="bg-gray-900/60 glass p-5 rounded-xl border border-emerald-500/6">
+            <div className="mb-6">
+              <div className="text-sm text-muted">Профиль</div>
+              <div className="mt-2 font-semibold text-[var(--text)] break-words">{user?.email}</div>
             </div>
+
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-center justify-between">
+                <div>
+                  <div className="text-muted">Тариф</div>
+                  <div className="font-semibold">FREE</div>
+                </div>
+                <div className="text-sm text-neon font-bold">Free</div>
+              </li>
+
+              <li>
+                <div className="text-muted">Баланс токенов</div>
+                <div className="text-neon font-bold text-xl">{profile?.token_balance ?? 0}</div>
+              </li>
+
+              <li>
+                <button onClick={handleBuyTokensPrompt} className="w-full mt-2 btn-neon text-white">Пополнить</button>
+              </li>
+
+              <li className="pt-4 border-t border-white/5">
+                <nav className="flex flex-col gap-2 text-sm">
+                  <a className="text-[var(--text)]">📌 Профиль</a>
+                  <a className="text-[var(--text)]">⭐ Подписка</a>
+                  <a className="text-[var(--text)]">⚡ Токены</a>
+                  <a className="text-[var(--text)]">📝 Лента запросов</a>
+                  <a className="text-[var(--text)]">🤝 Партнёрская программа</a>
+                  <button onClick={handleLogout} className="mt-2 px-3 py-2 rounded-md border border-white/6 text-sm text-white">Выход</button>
+                </nav>
+              </li>
+            </ul>
           </div>
         </aside>
 
-        {/* Main content - central column grows when sidebars collapsed */}
-        <section className={`col-span-12 lg:col-span-${leftCollapsed || rightCollapsed ? '12' : '6'} transition-all duration-300`}>
-          {/* Providers & settings (kept full width inside central area) */}
+        {/* Left narrow fixed strip when collapsed */}
+        {leftMode === "collapsed" && (
+          <div style={{ top: headerHeight }} className="fixed left-3 z-40">
+            <div className="flex flex-col items-center gap-3 py-3 bg-transparent rounded-md">
+              <button onClick={() => { setActiveTab('chat'); openLeftOverlay(); }} className="p-2 rounded-md" title="Chat">
+                <span className={neonIconClass}><Icon.Chat /></span>
+              </button>
+              <button onClick={() => { setActiveTab('profile'); openLeftOverlay(); }} className="p-2 rounded-md" title="Profile">
+                <span className={neonIconClass}><Icon.User /></span>
+              </button>
+              <button onClick={() => { setActiveTab('image'); openLeftOverlay(); }} className="p-2 rounded-md" title="Images">
+                <span className={neonIconClass}><Icon.Token /></span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Left overlay (fixed) */}
+        {leftMode === "overlay" && (
+          <div style={{ top: headerHeight, left: 20, bottom: 20 }} className="fixed z-50 w-[360px] max-w-[90vw] glass rounded-xl border border-emerald-500/12 p-4 overflow-auto shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold">Профиль</div>
+              <div>
+                <button onClick={closeLeftOverlay} className="px-2 py-1 rounded-md border border-white/6">Close</button>
+              </div>
+            </div>
+
+            {/* Reuse same content as left aside */}
+            <div className="mb-6">
+              <div className="text-sm text-muted">Email</div>
+              <div className="mt-2 font-semibold text-[var(--text)] break-words">{user?.email}</div>
+            </div>
+
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-center justify-between">
+                <div>
+                  <div className="text-muted">Тариф</div>
+                  <div className="font-semibold">FREE</div>
+                </div>
+                <div className="text-sm text-neon font-bold">Free</div>
+              </li>
+
+              <li>
+                <div className="text-muted">Баланс токенов</div>
+                <div className="text-neon font-bold text-xl">{profile?.token_balance ?? 0}</div>
+              </li>
+
+              <li>
+                <button onClick={handleBuyTokensPrompt} className="w-full mt-2 btn-neon text-white">Пополнить</button>
+              </li>
+
+              <li className="pt-4 border-t border-white/5">
+                <nav className="flex flex-col gap-2 text-sm">
+                  <a className="text-[var(--text)]">📌 Профиль</a>
+                  <a className="text-[var(--text)]">⭐ Подписка</a>
+                  <a className="text-[var(--text)]">⚡ Токены</a>
+                  <a className="text-[var(--text)]">📝 Лента запросов</a>
+                  <a className="text-[var(--text)]">🤝 Партнёрская программа</a>
+                  <button onClick={handleLogout} className="mt-2 px-3 py-2 rounded-md border border-white/6 text-sm text-white">Выход</button>
+                </nav>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        {/* Central area (span adjusts based on which original asides are present) */}
+        <section className={`col-span-12 ${centralSpanClass} transition-all duration-300`}>
           <div className="space-y-6">
+            {/* Providers block */}
             <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -420,6 +522,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Settings block */}
             <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
               <div className="flex items-center justify-between mb-3">
                 <div className="font-semibold">Настройки — {activeTab}</div>
@@ -507,7 +610,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Tariff & Tokens */}
+            {/* Tariff & tokens */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
                 <div className="text-sm text-muted">Тариф</div>
@@ -552,45 +655,67 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Right sidebar */}
-        <aside className={`col-span-12 lg:col-span-3 transition-all duration-300 ${rightCollapsed ? 'w-16 lg:w-16' : 'w-full lg:w-auto'}`}>
-          <div className={`flex ${rightCollapsed ? 'justify-center' : ''}`}>
-            <div className={`${rightCollapsed ? 'w-16' : 'w-full'} ${rightCollapsed ? '' : 'glass'} rounded-xl overflow-hidden`}>
-              {rightCollapsed ? (
-                <div className="flex flex-col items-center gap-4 py-4">
-                  <button onClick={() => alert('History (soon)')} className="p-2 rounded-md hover:scale-110 transition" title="History">
-                    <span className={neonIconClass}><Icon.Token /></span>
-                  </button>
-                  <button onClick={() => alert('Export (soon)')} className="p-2 rounded-md hover:scale-110 transition" title="Export">
-                    <span className={neonIconClass}><Icon.Cog /></span>
-                  </button>
-                  <button onClick={() => alert('Support')} className="p-2 rounded-md hover:scale-110 transition" title="Support">
-                    <span className={neonIconClass}><Icon.User /></span>
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
-                  <div className="text-sm text-muted">Quick actions</div>
-                  <div className="mt-3 flex flex-col gap-2">
-                    <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">История запросов</button>
-                    <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Экспорт</button>
-                    <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Безопасность</button>
-                  </div>
-                </div>
-              )}
+        {/* Right aside (original) - shown on mobile always, on lg only when rightMode === 'expanded' */}
+        <aside className={`col-span-12 lg:col-span-3 ${rightMode === 'expanded' ? 'lg:block' : 'lg:hidden'}`}>
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6">
+            <div className="text-sm text-muted">Quick actions</div>
+            <div className="mt-3 flex flex-col gap-2">
+              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">История запросов</button>
+              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Экспорт</button>
+              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Безопасность</button>
             </div>
           </div>
 
-          {/* Support card */}
-          {!rightCollapsed && (
+          <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6 mt-4">
+            <div className="text-sm text-muted">Поддержка</div>
+            <div className="mt-3 text-sm">
+              Вопросы по интеграции — <a href="mailto:you@cataleya.app" className="text-neon">you@cataleya.app</a>
+            </div>
+          </div>
+        </aside>
+
+        {/* Right narrow fixed strip when collapsed */}
+        {rightMode === "collapsed" && (
+          <div style={{ top: headerHeight }} className="fixed right-3 z-40">
+            <div className="flex flex-col items-center gap-3 py-3 bg-transparent rounded-md">
+              <button onClick={() => { alert('Requests (soon)'); openRightOverlay(); }} className="p-2 rounded-md" title="History">
+                <span className={neonIconClass}><Icon.Token /></span>
+              </button>
+              <button onClick={() => { alert('Export (soon)'); openRightOverlay(); }} className="p-2 rounded-md" title="Export">
+                <span className={neonIconClass}><Icon.Cog /></span>
+              </button>
+              <button onClick={() => { alert('Support'); openRightOverlay(); }} className="p-2 rounded-md" title="Support">
+                <span className={neonIconClass}><Icon.User /></span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Right overlay */}
+        {rightMode === "overlay" && (
+          <div style={{ top: headerHeight, right: 20, bottom: 20 }} className="fixed z-50 w-[360px] max-w-[90vw] glass rounded-xl border border-emerald-500/12 p-4 overflow-auto shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold">Quick actions</div>
+              <div>
+                <button onClick={closeRightOverlay} className="px-2 py-1 rounded-md border border-white/6">Close</button>
+              </div>
+            </div>
+
+            <div className="text-sm text-muted">Возможности</div>
+            <div className="mt-3 flex flex-col gap-2">
+              <button onClick={()=>alert("Запросы истории (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">История запросов</button>
+              <button onClick={()=>alert("Экспорт данных (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Экспорт</button>
+              <button onClick={()=>alert("Настройки безопасности (скоро)")} className="px-3 py-2 rounded-md border border-white/6 text-left text-white">Безопасность</button>
+            </div>
+
             <div className="bg-gray-900/60 glass p-4 rounded-xl border border-emerald-500/6 mt-4">
               <div className="text-sm text-muted">Поддержка</div>
               <div className="mt-3 text-sm">
                 Вопросы по интеграции — <a href="mailto:you@cataleya.app" className="text-neon">you@cataleya.app</a>
               </div>
             </div>
-          )}
-        </aside>
+          </div>
+        )}
       </main>
     </div>
   );
